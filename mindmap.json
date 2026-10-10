@@ -1,0 +1,117 @@
+{
+  "_說明": "呢個係你自己嘅 mind map:driver(宏觀指標)升/跌 → 邊啲股票/板塊受惠或受壓。系統會自動檢查 driver 近期走勢,觸發咗嘅論點會喺網頁標示,並標記候選股係順風定逆風。你可以隨時加/改。groups 用 GICS 子行業或板塊關鍵字做包含式比對。",
+  "drivers": [
+    {
+      "id": "CL=F", "name": "原油 WTI", "kind": "pct", "threshold": 0.05,
+      "up": {
+        "thesis": "油價升:上游生產商/油服受惠;航空、郵輪、貨運成本壓力上升",
+        "benefit_groups": ["Oil & Gas", "Coal"],
+        "benefit": ["XOM", "CVX", "COP", "OXY", "EOG", "DVN", "FANG", "HAL", "SLB", "APA", "MPC", "VLO"],
+        "hurt_groups": ["Airlines", "Cruise"],
+        "hurt": ["DAL", "UAL", "AAL", "LUV", "CCL", "RCL", "NCLH", "FDX", "UPS"]
+      },
+      "down": {
+        "thesis": "油價跌:航空/郵輪/運輸成本下降受惠;油股承壓",
+        "benefit_groups": ["Airlines", "Cruise"],
+        "benefit": ["DAL", "UAL", "AAL", "LUV", "CCL", "RCL", "NCLH"],
+        "hurt_groups": ["Oil & Gas"],
+        "hurt": ["XOM", "CVX", "COP", "OXY", "EOG", "DVN", "FANG", "HAL", "SLB"]
+      }
+    },
+    {
+      "id": "^TNX", "name": "美國10年期國債息率", "kind": "abs", "threshold": 0.20,
+      "up": {
+        "thesis": "息率升:銀行/保險淨息差受惠;高增長科技股估值(DCF)受壓",
+        "benefit_groups": ["Banks", "Insurance", "Diversified Financial"],
+        "benefit": ["JPM", "BAC", "WFC", "C", "GS", "MS", "SCHW", "USB", "PNC", "TFC", "KEY", "CFG", "RF", "MTB"],
+        "hurt_groups": ["Software", "Internet", "Interactive Media"],
+        "hurt": ["SNOW", "NET", "DDOG", "ZS", "MDB", "TEAM", "SHOP", "RBLX", "U", "AFRM", "UPST"]
+      },
+      "down": {
+        "thesis": "息率跌:成長/科技股估值回升;房地產、公用事業受惠",
+        "benefit_groups": ["Software", "Internet", "Real Estate", "Homebuilding"],
+        "benefit": ["NVDA", "MSFT", "AMZN", "META", "NOW", "CRM", "SNOW", "NET", "DDOG", "DHI", "LEN", "PHM"],
+        "hurt_groups": ["Banks"],
+        "hurt": ["JPM", "BAC", "WFC", "C"]
+      }
+    },
+    {
+      "id": "BTC-USD", "name": "比特幣", "kind": "pct", "threshold": 0.10,
+      "up": {
+        "thesis": "BTC 上升:加密概念股(交易所、礦工、持幣公司)直接受惠",
+        "benefit_groups": [],
+        "benefit": ["COIN", "MSTR", "MARA", "RIOT", "CLSK", "HUT", "HOOD", "CIFR", "WULF", "IREN", "CORZ", "BTDR", "GLXY", "CRCL"],
+        "hurt_groups": [], "hurt": []
+      },
+      "down": {
+        "thesis": "BTC 下跌:加密概念股承壓,避免追入",
+        "benefit_groups": [], "benefit": [],
+        "hurt_groups": [],
+        "hurt": ["COIN", "MSTR", "MARA", "RIOT", "CLSK", "HUT", "HOOD", "CIFR", "WULF", "IREN", "CORZ"]
+      }
+    },
+    {
+      "id": "GC=F", "name": "黃金", "kind": "pct", "threshold": 0.04,
+      "up": {
+        "thesis": "金價升:金礦股受惠(避險/實質息率下降)",
+        "benefit_groups": ["Gold", "Precious Metals"],
+        "benefit": ["NEM", "AEM", "GOLD", "FNV", "WPM", "KGC", "RGLD", "HMY"],
+        "hurt_groups": [], "hurt": []
+      },
+      "down": {
+        "thesis": "金價跌:金礦股承壓",
+        "benefit_groups": [], "benefit": [],
+        "hurt_groups": ["Gold", "Precious Metals"], "hurt": ["NEM", "AEM", "GOLD", "FNV", "WPM", "KGC"]
+      }
+    },
+    {
+      "id": "HG=F", "name": "銅", "kind": "pct", "threshold": 0.05,
+      "up": {
+        "thesis": "銅價升(景氣/電氣化需求):銅礦、電力基建受惠",
+        "benefit_groups": ["Copper", "Metals & Mining", "Electrical Components"],
+        "benefit": ["FCX", "SCCO", "TECK", "ETN", "VRT", "PWR", "GEV", "HUBB"],
+        "hurt_groups": [], "hurt": []
+      },
+      "down": {
+        "thesis": "銅價跌:景氣擔憂,礦業/工業承壓",
+        "benefit_groups": [], "benefit": [],
+        "hurt_groups": ["Copper", "Metals & Mining"], "hurt": ["FCX", "SCCO", "TECK"]
+      }
+    },
+    {
+      "id": "DX-Y.NYB", "name": "美元指數", "kind": "pct", "threshold": 0.025,
+      "up": {
+        "thesis": "美元強:跨國企業盈利折算受壓;商品、新興市場承壓",
+        "benefit_groups": [], "benefit": [],
+        "hurt_groups": ["Gold", "Metals & Mining"], "hurt": ["NEM", "FCX", "MCD", "KO", "PEP", "PG"]
+      },
+      "down": {
+        "thesis": "美元弱:商品、新興市場、跨國企業受惠",
+        "benefit_groups": ["Gold", "Metals & Mining"], "benefit": ["NEM", "FCX", "MCD", "KO", "PEP", "BABA", "PDD", "MELI"],
+        "hurt_groups": [], "hurt": []
+      }
+    },
+    {
+      "id": "^VIX", "name": "VIX 恐慌指數", "kind": "abs", "threshold": 3.0,
+      "up": {
+        "thesis": "VIX 急升:市場避險,突破策略假突破增加 → 減倉/用較保守入場法(收市確認或回踩)",
+        "benefit_groups": ["Utilities", "Consumer Staples", "Health Care"], "benefit": [],
+        "hurt_groups": [], "hurt": []
+      },
+      "down": {
+        "thesis": "VIX 回落:風險偏好回升,突破跟進成功率較高",
+        "benefit_groups": [], "benefit": [], "hurt_groups": [], "hurt": []
+      }
+    }
+  ],
+  "sector_etfs": {
+    "XLK": "科技", "XLF": "金融", "XLE": "能源", "XLV": "醫療", "XLY": "非必需消費",
+    "XLP": "必需消費", "XLI": "工業", "XLB": "原材料", "XLU": "公用事業", "XLRE": "房地產",
+    "XLC": "通訊", "SMH": "半導體", "IGV": "軟件", "XBI": "生科", "ARKK": "創新成長", "IBIT": "比特幣ETF"
+  },
+  "note_pairs": [
+    "上游/下游:例如油價升 → XOM 對 VLO 比率上升(例:857 對 386)",
+    "領先/跟隨:大市值龍頭突破後,同組小市值股常跟隨(例:GME → BB)",
+    "業績連動:供應鏈上游業績 beat → 下游/子公司股價經常延遲一日反應(例:ASML → ASMPT)"
+  ]
+}

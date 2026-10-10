@@ -1,0 +1,42 @@
+name: daily-vcp-radar
+
+on:
+  schedule:
+    - cron: "30 22 * * 1-5"   # 美股收市後(UTC 22:30,香港約翌日 06:30),星期一至五
+  workflow_dispatch: {}        # 可以喺 Actions 頁手動撳 Run workflow
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python screener.py
+      - run: mkdir -p _site && cp out/index.html _site/index.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
