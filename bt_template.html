@@ -1,0 +1,130 @@
+<meta charset="utf-8">
+<title>VCP 回測報告</title>
+<style>
+:root{--bg:#f5f6f4;--panel:#ffffff;--ink:#1c2420;--muted:#5d6a63;--line:#dde2de;--accent:#0f6b5c;--good:#15803d;--bad:#b42318;--warn:#a15c07;--c1:#0f6b5c;--c2:#c2410c;--c3:#6b7280;--c4:#2563eb;
+ --sans:"Noto Sans HK","PingFang HK","Microsoft JhengHei",system-ui,sans-serif;--num:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1512;--panel:#17201b;--ink:#e6ece8;--muted:#9aa8a0;--line:#2a362f;--accent:#3ddbb8;--good:#4ade80;--bad:#f87171;--warn:#fbbf24;--c1:#3ddbb8;--c2:#fb923c;--c3:#9aa8a0;--c4:#60a5fa;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1512;--panel:#17201b;--ink:#e6ece8;--muted:#9aa8a0;--line:#2a362f;--accent:#3ddbb8;--good:#4ade80;--bad:#f87171;--warn:#fbbf24;--c1:#3ddbb8;--c2:#fb923c;--c3:#9aa8a0;--c4:#60a5fa;color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.65;font-size:15px}
+.wrap{max-width:980px;margin:0 auto;padding:24px 16px 56px}
+h1{font-size:26px;margin:0 0 4px;text-wrap:balance}
+h2{font-size:17px;margin:34px 0 10px;padding-top:6px}
+.sub{color:var(--muted);font-size:13px}
+.verdict{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--warn);padding:14px 16px;margin:18px 0;border-radius:6px}
+.verdict b{color:var(--ink)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;margin:4px 0 10px}
+.seg button{background:var(--panel);color:var(--muted);border:0;padding:7px 12px;font:inherit;font-size:13px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--bg)}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.tbl{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:13.5px}
+th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:500;font-size:12px}
+td{font-family:var(--num);font-variant-numeric:tabular-nums}
+td:first-child{font-family:var(--sans)}
+tr:last-child td{border-bottom:0}
+.pos{color:var(--good)}.neg{color:var(--bad)}
+canvas{width:100%;height:320px;display:block;background:var(--panel);border:1px solid var(--line);border-radius:6px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;margin:8px 0}
+.legend i{display:inline-block;width:14px;height:3px;margin-right:6px;vertical-align:middle}
+ul{padding-left:20px}li{margin:5px 0}
+.note{color:var(--muted);font-size:13px}
+</style>
+<div class="wrap">
+<h1>VCP 回測報告</h1>
+<div class="sub" id="meta"></div>
+<div class="verdict" id="verdict"></div>
+
+<h2>1. 大市過濾比較</h2>
+<div class="seg" id="entrySeg" role="group" aria-label="入場假設">
+ <button data-m="close" aria-pressed="true">收市價入場(保守)</button>
+ <button data-m="pivot" aria-pressed="false">突破位入場(樂觀)</button>
+</div>
+<div class="tbl"><table id="tbl"></table></div>
+<p class="note" id="entryNote"></p>
+
+<h2>2. 資金曲線(起始 $100,000)</h2>
+<div class="legend" id="legend"></div>
+<canvas id="cv" role="img" aria-label="資金曲線"></canvas>
+
+<h2>3. 逐年表現</h2>
+<div class="tbl"><table id="ytbl"></table></div>
+
+<h2>4. 入場時大市燈號 vs 每單期望值</h2>
+<div class="tbl"><table id="rtbl"></table></div>
+<p class="note">以收市價入場、全部訊號(未受倉位上限限制)計算。R = 以初始止蝕距離為 1 單位。</p>
+
+<h2>5. 點解要小心睇呢啲數字</h2>
+<ul>
+<li><b>倖存者偏差</b>:成分股係今日名單,當年之後被剔走或倒閉嘅股票唔在入面,結果偏樂觀。</li>
+<li><b>收市價入場 vs 突破位入場</b>:突破位入場係「當日收市確認突破」先入,但實際買入係盤中,會包括收市前失敗嘅假突破,所以突破位版本係<b>樂觀上限</b>;收市價版本係<b>保守下限</b>。實際大約喺兩者之間。</li>
+<li><b>日線限制</b>:同一日觸及止蝕同目標,一律當止蝕先成交(保守)。</li>
+<li><b>冇計業績公佈</b>:實盤會避開業績前一星期,回測未做到,gap down 會令止蝕滑價。</li>
+<li><b>形態偵測係演算法近似</b>,同人手睇圖有出入;市值門檻因無歷史數據未用。</li>
+<li><b>冇做參數優化</b>,全部用教學原參數,避免過擬合。</li>
+</ul>
+<p class="note">滑價每邊 0.1%,未計佣金。倉位:每注風險 1% 資金,單倉最多 25%,最多 10 個同時持倉,總曝險不超過資金。</p>
+</div>
+<script>
+const D=/*__DATA__*/null;
+const $=s=>document.querySelector(s);
+const MODES=[["all","無大市過濾"],["notred","避開紅燈(≥4 分)"],["green","只做綠燈(≥7 分)"],["advice","按燈號調整注碼/總風險"]];
+const fmt=(v,d=1,s='')=>(v>0?'+':'')+v.toFixed(d)+s;
+const cls=v=>v>0?'pos':(v<0?'neg':'');
+let entry='close', policy='mixed';
+$('#meta').textContent=`${D.start} 至 ${D.end} · 股票池 ${D.nuni} 隻(美股,今日成分) · 規則同網站一致,未做參數優化`;
+function render(){
+  const d=D[entry];
+  let h='<tr><th>設定</th><th>交易數</th><th>勝率</th><th>平均贏(R)</th><th>平均蝕(R)</th><th>期望值(R)</th><th>盈虧比</th><th>年化</th><th>最大回撤</th><th>夏普</th></tr>';
+  for(const [k,l] of MODES){
+    const r=d.results[policy+'/'+k];
+    h+=`<tr><td>${l}</td><td>${r.trades}</td><td>${r.win_rate}%</td><td>${r.avg_win_R}</td><td>${r.avg_loss_R}</td><td class="${cls(r.expectancy_R)}">${fmt(r.expectancy_R,2)}</td><td>${r.profit_factor}</td><td class="${cls(r.cagr)}">${fmt(r.cagr,1,'%')}</td><td class="neg">${r.maxdd}%</td><td>${r.sharpe}</td></tr>`;
+  }
+  h+=`<tr><td>買入持有 SPY</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="pos">${fmt(D.spy.cagr,1,'%')}</td><td class="neg">${D.spy.maxdd}%</td><td>—</td></tr>`;
+  $('#tbl').innerHTML=h;
+  $('#entryNote').textContent= entry==='close'
+   ? '收市價入場:突破日收市確認(收市價 + 0.1% 滑價)先買入,冇偷步,結果較保守。'
+   : '突破位入場:喺突破位 +0.15% 掛 stop 單買入,但只計「當日收市真係高過突破位且量足」嘅訊號,存在前瞻偏差,結果偏樂觀。';
+  // yearly
+  const ys=Object.keys(D.spy.years);
+  let y='<tr><th>年份</th>'+MODES.map(m=>`<th>${m[1]}</th>`).join('')+'<th>SPY</th></tr>';
+  for(const yr of ys){
+    y+=`<tr><td>${yr}</td>`+MODES.map(([k])=>{const v=d.results[policy+'/'+k].years[yr];return `<td class="${cls(v)}">${v==null?'—':fmt(v,1,'%')}</td>`}).join('')+`<td class="${cls(D.spy.years[yr])}">${fmt(D.spy.years[yr],1,'%')}</td></tr>`;
+  }
+  $('#ytbl').innerHTML=y;
+  let r='<tr><th>入場時燈號</th><th>交易數</th><th>勝率</th><th>平均贏(R)</th><th>平均蝕(R)</th><th>期望值(R)</th></tr>';
+  for(const [k,v] of Object.entries(D.close.regime)) r+=`<tr><td>${k}</td><td>${v.n}</td><td>${v.win}%</td><td>${v.avgwin}</td><td>${v.avgloss}</td><td class="${cls(v.exp)}">${fmt(v.exp,2)}</td></tr>`;
+  $('#rtbl').innerHTML=r;
+  draw();
+}
+const COL=['--c1','--c2','--c4','--c3'];
+function draw(){
+  const cv=$('#cv'), dpr=window.devicePixelRatio||1, W=cv.clientWidth, Hh=cv.clientHeight;
+  cv.width=W*dpr; cv.height=Hh*dpr; const x=cv.getContext('2d'); x.scale(dpr,dpr);
+  const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const series=[];
+  const d=D[entry];
+  const pick=[['all','--c2'],['green','--c1'],['advice','--c4']];
+  pick.forEach(([k,c])=>series.push({l:MODES.find(m=>m[0]===k)[1],c:css(c),v:d.curves[policy+'/'+k]}));
+  series.push({l:'買入持有 SPY',c:css('--c3'),v:D.spy_curve,dash:true});
+  const n=D.dates.length; let lo=1e9,hi=0;
+  series.forEach(s=>s.v.forEach(v=>{if(v<lo)lo=v;if(v>hi)hi=v}));
+  lo=Math.floor(lo/20000)*20000; hi=Math.ceil(hi/20000)*20000;
+  const L=52,Rr=12,T=12,Bt=26,pw=W-L-Rr,ph=Hh-T-Bt;
+  const X=i=>L+pw*i/(n-1), Y=v=>T+ph*(1-(v-lo)/(hi-lo));
+  x.font='11px '+css('--num'); x.textAlign='right'; x.textBaseline='middle';
+  for(let v=lo;v<=hi;v+=20000){x.strokeStyle=css('--line');x.beginPath();x.moveTo(L,Y(v));x.lineTo(W-Rr,Y(v));x.stroke();x.fillStyle=css('--muted');x.fillText((v/1000)+'k',L-6,Y(v));}
+  x.textAlign='center';x.textBaseline='top';let last='';
+  D.dates.forEach((dt,i)=>{const y=dt.slice(0,4);if(y!==last&&(+y)%1===0){last=y;if(i>0||true){x.fillStyle=css('--muted');x.fillText(y,Math.min(Math.max(X(i),L+8),W-Rr-8),Hh-Bt+8);x.strokeStyle=css('--line');x.beginPath();x.moveTo(X(i),T);x.lineTo(X(i),T+ph);x.stroke();}}});
+  series.forEach(s=>{x.strokeStyle=s.c;x.lineWidth=s.dash?1.5:2;x.setLineDash(s.dash?[5,4]:[]);x.beginPath();
+    s.v.forEach((v,i)=>{const px=X(Math.min(i,n-1));i?x.lineTo(px,Y(v)):x.moveTo(px,Y(v));});x.stroke();});
+  x.setLineDash([]);
+  $('#legend').innerHTML=series.map(s=>`<span><i style="background:${s.c}"></i>${s.l} ${Math.round(s.v[s.v.length-1]/1000)}k</span>`).join('');
+}
+document.querySelectorAll('#entrySeg button').forEach(b=>b.onclick=()=>{
+  entry=b.dataset.m; document.querySelectorAll('#entrySeg button').forEach(o=>o.setAttribute('aria-pressed',o===b)); render();});
+const a=D.close.results['mixed/all'], g=D.close.results['mixed/green'], pa=D.pivot.results['mixed/all'], pg=D.pivot.results['mixed/green'];
+$('#verdict').innerHTML=`<b>結論:</b>按教學原規則,喺 ${D.start.slice(0,4)} 至今呢個股票池入面,呢個系統<b>冇顯示出可靠嘅正期望值</b>。收市價入場(保守)每單期望值只有 ${fmt(a.expectancy_R,2)}R,年化 ${fmt(a.cagr,1,'%')},跑輸買入持有 SPY(${fmt(D.spy.cagr,1,'%')});突破位入場(樂觀)期望值 ${fmt(pa.expectancy_R,2)}R,年化 ${fmt(pa.cagr,1,'%')}。<br><b>大市過濾有用:</b>只做綠燈令最大回撤收窄(保守版 ${a.maxdd}% → ${g.maxdd}%,樂觀版 ${pa.maxdd}% → ${pg.maxdd}%),紅燈入場每單期望值明顯最差。但過濾主要係減少虧損,並冇令策略變成穩定贏錢。`;
+render(); addEventListener('resize',draw);
+</script>
