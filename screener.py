@@ -155,7 +155,7 @@ def analyze(t, d, rs_raw_all, meta, mkt):
     if n < 210:
         return None
     t_i = n - 1
-    s20, s50, s150, s200 = sma(c, 20), sma(c, 50), sma(c, 150), sma(c, 200)
+    s10, s20, s50, s150, s200 = sma(c, 10), sma(c, 20), sma(c, 50), sma(c, 150), sma(c, 200)
     hi52 = float(h[-252:].max()); lo52 = float(l[-252:].min())
     last = float(c[-1])
     avg_dv = float(np.mean(c[-50:] * v[-50:]))
@@ -174,7 +174,7 @@ def analyze(t, d, rs_raw_all, meta, mkt):
     flat150 = bool(s150[-1] / s150[-22] - 1 < T.get("stage3_flat_150_pct", 0.01))
     ran = bool(hi52 / lo52 - 1 >= T.get("stage3_min_run", 0.30))
     stage3 = bool(T.get("exclude_stage3", True) and flat150 and ran)
-    return dict(ticker=t, o=o, h=h, l=l, c=c, v=v, s20=s20, s50=s50, s150=s150, s200=s200,
+    return dict(ticker=t, o=o, h=h, l=l, c=c, v=v, s10=s10, s20=s20, s50=s50, s150=s150, s200=s200,
                hi52=hi52, lo52=lo52, last=last, avg_dv=avg_dv, tt=tt, n=n, meta=meta, mkt=mkt, stage3=stage3)
 
 
@@ -239,6 +239,19 @@ def build_stock(x, rs, ev):
     if (ref - stop) / ref < E["min_stop_pct"]:
         stop = ref * (1 - E["min_stop_pct"]); stop_adj = True
     risk_pct = (ref - stop) / ref
+    stop_src = "handle 低位"
+    no_entry = False
+    if risk_pct > E["max_stop_pct"]:
+        # 教學:止蝕過闊時,喺 10% 內搵其他技術支持(10/20 日線);搵唔到就唔入
+        for nm, key in (("10 日線", "s10"), ("20 日線", "s20")):
+            ma_v = float(x[key][-1])
+            st = ma_v * (1 - E["stop_below_handle_low"])
+            rp = (ref - st) / ref
+            if st < ref and E["min_stop_pct"] <= rp <= E["max_stop_pct"]:
+                stop, risk_pct, stop_src = st, rp, nm
+                break
+        else:
+            no_entry = True
     r1 = ref * (1 + risk_pct * 1.5); r2 = ref * (1 + risk_pct * 2); r3 = ref * (1 + risk_pct * 3)
     # 左邊阻力:近一年、現價之上最近一個局部高位(教學:有明顯阻力就用嚟決定止賺位)
     resist = None
@@ -293,7 +306,7 @@ def build_stock(x, rs, ev):
         risk_pct=round(risk_pct * 100, 1), t15=round(r1, 2), t2=round(r2, 2), t3=round(r3, 2), resist=resist,
         dist_pct=round(dist * 100, 1), status=status, code=code, k=k, vol_ratio=ev["vol_ratio"],
         rs=int(rs), tt=x["tt"], tt_n=tt_n, base={kk: vv for kk, vv in base.items() if kk not in ("peak_i", "geo")}, geo=geo,
-        score=int(score), bases=int(nbases), climax=climax, stop_wide=bool(risk_pct > E["max_stop_pct"]), stop_adj=stop_adj,
+        score=int(score), bases=int(nbases), climax=climax, stop_wide=bool(risk_pct > E["max_stop_pct"]), stop_adj=stop_adj, stop_src=stop_src, no_entry=no_entry,
         hi52=round(x["hi52"], 2), pct_from_hi=round((last / x["hi52"] - 1) * 100, 1),
         avg_dollar_vol=int(x["avg_dv"]), bars=bars, ma=ma)
 
