@@ -303,7 +303,7 @@ function tags(s) {
   if (s.sales_ok===true) t.push(`<span class="tag good" title="最新季銷售增長 ${(s.sales_growth*100).toFixed(0)}%">銷售↑${(s.sales_growth*100).toFixed(0)}%</span>`);
   if (s.sales_ok===false) t.push(`<span class="tag warn" title="最新季銷售增長 ${(s.sales_growth*100).toFixed(0)}%">銷售弱</span>`);
   if (s.mcap_ok===false) t.push(`<span class="tag warn">市值偏細</span>`);
-  if (s.stop_adj) t.push(`<span class="tag" title="技術止蝕太近,已改用最少 4% 止蝕">止蝕已放寬</span>`);
+  if (s.stop_adj) t.push(`<span class="tag" title="技術止蝕太近,已改用最少 5% 止蝕">止蝕已放寬</span>`);
   if (s.stop_wide) t.push(`<span class="tag bad" title="止蝕距離超過 10%">止蝕過闊</span>`);
   return t.join('');
 }
@@ -378,7 +378,7 @@ function methodFor(s) {
 }
 function exitFor(s) {
   const early = (s.bases||0) <= 1;
-  return `<p>初始止蝕:<b>${fmt(s.stop)}</b>(handle 低位下 1%${s.stop_adj?',已放寬至最少 4%':''}),用 GTC stop order,唔用 stop-limit。</p>
+  return `<p>初始止蝕:<b>${fmt(s.stop)}</b>(handle 低位下 1%${s.stop_adj?',已放寬至最少 5%':''}),用 GTC stop order,唔用 stop-limit。</p>
   <p>賺到 2× 止蝕距離(${fmt(s.t2)})→ 止蝕上移至成本價(甚至 +2–3%);3×(${fmt(s.t3)})再上移。</p>
   <p>${early ? '偏早期 Stage 2:可用 <b>sell into weakness</b>(收市跌穿 20 日線,進取用 50 日線)讓利潤跑。'
               : '偏後期(已做 ' + s.bases + ' 個 base):用 <b>sell into strength</b>,2R(' + fmt(s.t2) + ')沽一半,3R 沽餘下。'}</p>

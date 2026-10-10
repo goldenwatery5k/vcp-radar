@@ -33,7 +33,7 @@
     "chase_limit_pct": 0.05,
     "stop_below_handle_low": 0.01,
     "max_stop_pct": 0.10,
-    "min_stop_pct": 0.04,
+    "min_stop_pct": 0.05,
     "scan_days_back": 8
   },
   "risk": {
