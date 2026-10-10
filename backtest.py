@@ -33,7 +33,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "out")
 CACHE = os.path.join(HERE, "data", "bt_prices_all.pkl")
 EARN_CACHE = os.path.join(HERE, "data", "earnings_cache.json")
-START_YEAR = int(sys.argv[1]) if len(sys.argv) > 1 else 2018
+START_YEAR = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else 2018
 SLIP = 0.001
 ENTRY = os.environ.get("ENTRY", "close")   # close = method 2 (confirm into close); pivot = method 1 (buy-stop at pivot)
 E, B, T = S.E, S.B, S.T
@@ -126,7 +126,7 @@ def build_signals(px, tick, min_price, min_dv):
             pts += (c > c.rolling(200).mean()).astype(float)
     pts += np.where(b50 >= 0.5, 2, np.where(b50 >= 0.35, 1, 0))
     pts += (s2p >= 0.15).astype(float) + (nh > nl).astype(float)
-    return dict(idx=idx, tick=tick, C=C, H=H, L=L, O=O, V=V, s10=s10, s20=s20, ev=ev, rs=rs, regime=pts, raw=raw, liquid=liquid,
+    return dict(idx=idx, tick=tick, C=C, H=H, L=L, O=O, V=V, s10=s10, s20=s20, ev=ev, rs=rs, regime=pts, raw=raw, liquid=liquid, s50=s50,
                 spy=px["SPY"]["Close"].reindex(idx).ffill())
 
 
