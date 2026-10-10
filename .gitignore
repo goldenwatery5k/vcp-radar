@@ -4,3 +4,6 @@ __pycache__/
 *.pyc
 .DS_Store
 data/bt_prices.pkl
+data/bt_prices_all.pkl
+data/earnings_cache.json
+data/sp500_hist*.csv
