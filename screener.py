@@ -236,6 +236,14 @@ def build_stock(x, rs, ev):
         stop = ref * (1 - E["min_stop_pct"]); stop_adj = True
     risk_pct = (ref - stop) / ref
     r1 = ref * (1 + risk_pct * 1.5); r2 = ref * (1 + risk_pct * 2); r3 = ref * (1 + risk_pct * 3)
+    # 左邊阻力:近一年、現價之上最近一個局部高位(教學:有明顯阻力就用嚟決定止賺位)
+    resist = None
+    hh = h[-252:-3]
+    for i in range(5, len(hh) - 5):
+        if hh[i] >= max(hh[i - 5:i + 6]) and hh[i] > ref * (1 + risk_pct * 1.0):
+            if resist is None or hh[i] < resist:
+                resist = float(hh[i])
+    resist = round(resist, 2) if resist else None
     # late stage: count breakouts to new 52w highs over past year
     zz = zigzag(h[-252:], l[-252:], 0.10)
     peaks = [p for p in zz if p[2] == "P"]
@@ -278,7 +286,7 @@ def build_stock(x, rs, ev):
         ticker=x["ticker"], market=x["mkt"], name=x["meta"].get("name", ""), sector=x["meta"].get("sector", ""),
         group=x["meta"].get("group", ""), tags=x["meta"].get("tags", []),
         close=round(last, 2), pivot=round(pivot, 2), entry=round(entry, 2), stop=round(stop, 2),
-        risk_pct=round(risk_pct * 100, 1), t15=round(r1, 2), t2=round(r2, 2), t3=round(r3, 2),
+        risk_pct=round(risk_pct * 100, 1), t15=round(r1, 2), t2=round(r2, 2), t3=round(r3, 2), resist=resist,
         dist_pct=round(dist * 100, 1), status=status, code=code, k=k, vol_ratio=ev["vol_ratio"],
         rs=int(rs), tt=x["tt"], tt_n=tt_n, base={kk: vv for kk, vv in base.items() if kk not in ("peak_i", "geo")}, geo=geo,
         score=int(score), bases=int(nbases), climax=climax, stop_wide=bool(risk_pct > E["max_stop_pct"]), stop_adj=stop_adj,
@@ -300,7 +308,7 @@ def build_s2_only(x, rs):
     return dict(
         ticker=x["ticker"], market=x["mkt"], name=x["meta"].get("name", ""), sector=x["meta"].get("sector", ""),
         group=x["meta"].get("group", ""), tags=x["meta"].get("tags", []), close=round(last, 2), pivot=None,
-        entry=None, stop=None, risk_pct=None, t15=None, t2=None, t3=None,
+        entry=None, stop=None, risk_pct=None, t15=None, t2=None, t3=None, resist=None,
         dist_pct=round((x["hi52"] / last - 1) * 100, 1), status="Stage 2 領導股 (未成形,放入 watchlist)",
         code="S2", k=None, vol_ratio=round(float(x["v"][-1] / max(1.0, np.mean(x["v"][-51:-1]))), 2),
         rs=int(rs), tt=x["tt"], tt_n=tt_n, base=None, score=int(tt_n / 8 * 40 + max(0, rs - 60) * 1.2),

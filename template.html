@@ -379,10 +379,15 @@ function methodFor(s) {
 }
 function exitFor(s) {
   const early = (s.bases||0) <= 1;
-  return `<p>初始止蝕:<b>${fmt(s.stop)}</b>(handle 低位下 1%${s.stop_adj?',已放寬至最少 5%':''}),用 GTC stop order,唔用 stop-limit。</p>
-  <p>賺到 2× 止蝕距離(${fmt(s.t2)})→ 止蝕上移至成本價(甚至 +2–3%);3×(${fmt(s.t3)})再上移。</p>
-  <p>${early ? '偏早期 Stage 2:可用 <b>sell into weakness</b>(收市跌穿 20 日線,進取用 50 日線)讓利潤跑。'
-              : '偏後期(已做 ' + s.bases + ' 個 base):用 <b>sell into strength</b>,2R(' + fmt(s.t2) + ')沽一半,3R 沽餘下。'}</p>
+  const m = s.ma || {}, l20 = (m.s20||[]).slice(-1)[0], l50 = (m.s50||[]).slice(-1)[0];
+  const rr = s.resist ? ((s.resist/s.entry-1)/(s.risk_pct/100)).toFixed(1) : null;
+  return `<p>初始止蝕:<b>${fmt(s.stop)}</b>(handle 低位下 1%${s.stop_adj?',已放寬至最少 5%':''}),用 GTC stop order,唔用 stop-limit。止蝕未被突破前唔好用 20/50 日線做止蝕(通常低過現價超過一成)。</p>
+  <p><b>風險回報底線 1.5:1</b>(${fmt(s.t15)}):低過 1.5R 嘅 setup 唔值得做;1:1 唔夠好。</p>
+  <p><b>賺到 2×止蝕距離(2R ${fmt(s.t2)})</b>→ 沽一半,止蝕上移至成本價(最好 +2–3%),叫止賺。<br>
+     <b>3R ${fmt(s.t3)}</b>→ 沽餘下,或再上移止蝕保護利潤。實際係 case by case,唔係死規矩。</p>
+  ${s.resist ? `<p><b>左邊阻力 ${fmt(s.resist)}</b>(約 ${rr}R):呢類位置之前有賣壓,升到附近可以提早止賺(教學:參考 base 左邊嘅明顯高位)。</p>` : ''}
+  <p>${early ? '偏早期 Stage 2(只做 ' + (s.bases||0) + ' 個 base):較適合 <b>sell into weakness</b>,俾股票空間。收市<b>跌穿 20 日線</b>(' + fmt(l20) + ',保守)或 <b>50 日線</b>(' + fmt(l50) + ',進取,回撤可達 13–15%)就走;跌穿當日量大 = 趨勢轉變(change of character)。呢兩條線要升到高過初始止蝕之後先用。'
+              : '偏後期(已做 ' + s.bases + ' 個 base)或成長有限嘅股票:較適合 <b>sell into strength</b>,到 2R 沽一半、3R 沽餘下,賺足就收手、釋放資金做下一隻。'}</p>
   <p>Violation(≥2 個就早走):突破後急跌返 20 日線且量大;連續 3 日高開低收帶大量;突破日量其實唔夠。業績前 7 日:冇倉唔入,輸緊就走,賺 5–10% 食一半。</p>`;
 }
 function drawDetail() {
@@ -425,14 +430,14 @@ function drawDetail() {
         return `<div class="plan-strip">
           <span class="pc buy">${triggered?'買入參考(現價)':'買入 buy-stop'} <b>${cu}${fmt(ref)}</b></span>
           <span class="pc sl">SL <b>${cu}${fmt(s.stop)}</b> −${s.risk_pct}%</span>
-          <span class="pc tp">TP1 1.5R <b>${cu}${fmt(s.t15)}</b> ${up(s.t15)}</span>
-          <span class="pc tp">TP2 2R <b>${cu}${fmt(s.t2)}</b> ${up(s.t2)}</span>
-          <span class="pc tp">TP3 3R <b>${cu}${fmt(s.t3)}</b> ${up(s.t3)}</span>
+          <span class="pc tp">底線 1.5R <b>${cu}${fmt(s.t15)}</b> ${up(s.t15)}</span>
+          <span class="pc tp">TP1 2R 沽一半 <b>${cu}${fmt(s.t2)}</b> ${up(s.t2)}</span>
+          <span class="pc tp">TP2 3R 沽餘下 <b>${cu}${fmt(s.t3)}</b> ${up(s.t3)}</span>
           <span class="pc">買入區上限 <b>${cu}${fmt(s.pivot*1.05)}</b>(+5%)</span>
         </div>`; })():`<div class="plan-strip"><span class="pc">未成形 base · 52週高 <b>${CUR(s.market)}${fmt(s.hi52)}</b></span></div>`}
       <div id="tv" class="tv"></div>
       <div class="legend"><span><i style="background:var(--ma20)"></i>20日</span><span><i style="background:var(--ma50)"></i>50日</span><span><i style="background:var(--ma150)"></i>150日</span><span><i style="background:var(--ma200)"></i>200日</span>
-        ${s.pivot?`<span><i style="background:var(--info)"></i>買點/買入區</span><span><i style="background:var(--down)"></i>SL 止蝕</span><span><i style="background:var(--up)"></i>TP 止賺(1.5R/2R/3R)</span>`:''}</div>
+        ${s.pivot?`<span><i style="background:var(--info)"></i>買點/買入區</span><span><i style="background:var(--down)"></i>SL 止蝕</span><span><i style="background:var(--up)"></i>TP 止賺(2R 沽一半 / 3R 沽餘下)</span>`:''}</div>
     </div>
     <div class="grid2c">
       <div class="sec"><h4>Stage 2 八條件(${s.tt_n}/8)</h4><ul class="chk">${ttList}</ul></div>
@@ -444,7 +449,7 @@ function drawDetail() {
       <div class="kv"><span>買入位</span><span class="num">${s.entry?cur+fmt(s.entry):'—'}</span></div>
       <div class="kv"><span>止蝕</span><span class="num">${s.stop?cur+fmt(s.stop):'—'}</span></div>
       <div class="kv"><span>止蝕距離</span><span class="num">${s.risk_pct!=null?s.risk_pct+'%':'—'}</span></div>
-      <div class="kv"><span>目標 1.5R / 2R / 3R</span><span class="num">${s.t15?`${fmt(s.t15)} / ${fmt(s.t2)} / ${fmt(s.t3)}`:'—'}</span></div>
+      <div class="kv"><span>底線 1.5R / TP1 2R / TP2 3R</span><span class="num">${s.t15?`${fmt(s.t15)} / ${fmt(s.t2)} / ${fmt(s.t3)}`:'—'}</span></div>
       <div class="kv"><span>量比(今日/50日)</span><span class="num">${fmt(s.vol_ratio,2)}×</span></div>
       <div class="kv"><span>52週高</span><span class="num">${cur}${fmt(hiv)} (${pct(s.pct_from_hi)})</span></div>
       <div class="kv"><span>日均成交額</span><span class="num">${cur}${(s.avg_dollar_vol/1e6).toFixed(0)}M</span></div>
@@ -542,7 +547,7 @@ function tvChart(host, s) {
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const C = {up:css('--up'), down:css('--down'), grid:css('--grid'), ink:css('--ink'), muted:css('--muted'), panel:css('--panel'),
     line:css('--line'), ma20:css('--ma20'), ma50:css('--ma50'), ma150:css('--ma150'), ma200:css('--ma200'),
-    info:css('--info'), good:css('--good'), bad:css('--bad')};
+    info:css('--info'), good:css('--good'), bad:css('--bad'), warn:css('--warn')};
   const rgba = (hex, a) => { const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim()); if (!m) return hex;
     const n = parseInt(m[1], 16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; };
   const cur = CUR(s.market);
@@ -607,9 +612,10 @@ function tvChart(host, s) {
     L(ref, C.info, triggered ? '買入參考(現價)' : '買入 buy-stop', LW.LineStyle.Solid, 2);
     L(s.stop, C.down, `SL -${s.risk_pct}%`, LW.LineStyle.Solid, 2);
     const up = p => ((p/ref-1)*100).toFixed(1);
-    L(s.t15, C.good, 'TP1', LW.LineStyle.Dashed);
-    L(s.t2, C.good, `TP2 2R +${up(s.t2)}%`, LW.LineStyle.Solid, 2);
-    L(s.t3, C.good, 'TP3', LW.LineStyle.Dashed);
+    L(s.t15, C.muted, '底線 1.5R', LW.LineStyle.Dotted);
+    L(s.t2, C.good, `TP1 2R +${up(s.t2)}% 沽一半`, LW.LineStyle.Solid, 2);
+    L(s.t3, C.good, 'TP2 3R 沽餘下', LW.LineStyle.Dashed);
+    if (s.resist) L(s.resist, C.warn, '左邊阻力', LW.LineStyle.LargeDashed);
   }
   // overlay (risk/reward boxes, base box, buy zone)
   const ov = document.createElement('canvas');
@@ -658,7 +664,7 @@ function tvChart(host, s) {
           x.fillStyle = C.ink;
           const rr = ((s.t2/ref-1)/(1-s.stop/ref)).toFixed(1);
           const items = [
-            {y: y2 + 9,  t: `TP2 ${cur}${s.t2.toFixed(2)}  +${((s.t2/ref-1)*100).toFixed(1)}%`},
+            {y: y2 + 9,  t: `TP1 ${cur}${s.t2.toFixed(2)}  +${((s.t2/ref-1)*100).toFixed(1)}%`},
             {y: yE - 9,  t: `買入 ${cur}${ref.toFixed(2)}  R:R 1:${rr}`},
             {y: yS - 9,  t: `SL ${cur}${s.stop.toFixed(2)}  -${s.risk_pct}%`}
           ].sort((p,q) => p.y - q.y);
