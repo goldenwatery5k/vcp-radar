@@ -26,7 +26,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/momentum.json
-          if git diff --cached --quiet; then echo "no change"; else git commit -m "Update momentum leaderboard" && git push; fi
+          if git diff --cached --quiet; then echo "no change"; else git commit -m "Update momentum leaderboard" && git pull --rebase origin main && git push; fi
       - name: Rebuild site
         env:
           GH_TOKEN: ${{ github.token }}
