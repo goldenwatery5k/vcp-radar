@@ -31,7 +31,8 @@ import universe
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "out")
-CACHE = os.path.join(HERE, "data", "bt_prices.pkl")
+CACHE = os.path.join(HERE, "data", "bt_prices_all.pkl")
+EARN_CACHE = os.path.join(HERE, "data", "earnings_cache.json")
 START_YEAR = int(sys.argv[1]) if len(sys.argv) > 1 else 2018
 SLIP = 0.001
 ENTRY = os.environ.get("ENTRY", "close")   # close = method 2 (confirm into close); pivot = method 1 (buy-stop at pivot)
@@ -39,13 +40,32 @@ E, B, T = S.E, S.B, S.T
 
 
 # ----------------------------------------------------------------- data
+def listed_us():
+    import requests, io, re
+    H = {"User-Agent": "Mozilla/5.0"}
+    out = set()
+    bad = re.compile(r"warrant|right|unit|preferred|note|debenture|trust|fund|etf|acquisition|depositary receipt|%", re.I)
+    for url, sym, etf, test, name in (
+            ("https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt", "Symbol", "ETF", "Test Issue", "Security Name"),
+            ("https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt", "ACT Symbol", "ETF", "Test Issue", "Security Name")):
+        df = pd.read_csv(io.StringIO(requests.get(url, headers=H, timeout=30).text), sep="|", dtype=str)
+        df = df[df[sym].notna() & ~df[sym].str.contains("File Creation", na=False)]
+        df = df[(df[etf] != "Y") & (df[test] != "Y")]
+        for t, nm in zip(df[sym], df[name]):
+            if not re.fullmatch(r"[A-Z]{1,5}", t) or bad.search(nm or ""):
+                continue
+            out.add(t)
+    return sorted(out)
+
+
 def load_prices():
     if os.path.exists(CACHE) and time.time() - os.path.getmtime(CACHE) < 3 * 86400:
         return pd.read_pickle(CACHE)
-    uni = [u["ticker"] for u in universe.load() if u["market"] == "US"]
-    tick = sorted(set(uni) | {"SPY", "QQQ", "IWM"})
+    base = [u["ticker"] for u in universe.load() if u["market"] == "US"]
+    tick = sorted(set(listed_us()) | set(base) | {"SPY", "QQQ", "IWM"})
+    print(f"downloading {len(tick)} tickers")
     out = {}
-    n = 80
+    n = 100
     for i in range(0, len(tick), n):
         ch = tick[i:i + n]
         try:
@@ -57,11 +77,11 @@ def load_prices():
         for t in ch:
             try:
                 d = df[t].dropna(subset=["Close"])
-                if len(d) > 260:
-                    out[t] = d[["Open", "High", "Low", "Close", "Volume"]]
+                if len(d) > 260 and float(d["Close"].iloc[-1]) >= 5 and float((d["Close"] * d["Volume"]).tail(50).mean()) >= 2e6:
+                    out[t] = d[["Open", "High", "Low", "Close", "Volume"]].astype("float32")
             except Exception:
                 pass
-        print(f"  downloaded {min(i + n, len(tick))}/{len(tick)} ({len(out)} ok)", flush=True)
+        print(f"  downloaded {min(i + n, len(tick))}/{len(tick)} ({len(out)} kept)", flush=True)
     os.makedirs(os.path.dirname(CACHE), exist_ok=True)
     pd.to_pickle(out, CACHE)
     return out
@@ -72,9 +92,8 @@ def rolling(df, n):
 
 
 # ----------------------------------------------------------------- signals
-def build_signals(px):
+def build_signals(px, tick, min_price, min_dv):
     idx = px["SPY"].index
-    tick = [t for t in px if t not in ("SPY", "QQQ", "IWM")]
     def mat(col):
         return pd.DataFrame({t: px[t][col] for t in tick}).reindex(idx)
     C, H, L, O, V = (mat(c) for c in ("Close", "High", "Low", "Open", "Volume"))
@@ -83,7 +102,7 @@ def build_signals(px):
     s10, s20, s50, s150, s200 = (rolling(C, n) for n in (10, 20, 50, 150, 200))
     hi52 = H.rolling(252, min_periods=200).max(); lo52 = L.rolling(252, min_periods=200).min()
     dv50 = rolling(C * V, 50)
-    liquid = (C >= 20) & (dv50 >= 15e6)
+    liquid = (C >= min_price) & (dv50 >= min_dv)
     r = lambda nb: C / C.shift(nb) - 1
     raw = 0.4 * r(63) + 0.2 * r(126) + 0.2 * r(189) + 0.2 * r(251)
     raw = raw.where(liquid)
@@ -165,7 +184,8 @@ def find_trades(sig, first_i):
         trades.append(dict(j=int(j), i=int(i), ticker=sig["tick"][j], entry=entry, stop=float(stop), risk=float(risk),
                            rs=float(rs[i, j]), bases=count_bases(h_, l_), regime=float(sig["regime"].iloc[i]),
                            dec=bool(base["decreasing"]), vol_dry=base["vol_dry"], hd=base["handle_depth"], pa=base["prior_adv"],
-                           ext=float(c_[-1] / piv - 1), vr=float(v_[-1] / max(1.0, np.mean(v_[-51:-1])))))
+                           ext=float(c_[-1] / piv - 1), vr=float(v_[-1] / max(1.0, np.mean(v_[-51:-1]))),
+                           date=sig["idx"][i]))
     return trades
 
 
@@ -216,7 +236,7 @@ def simulate(tr, sig, policy):
 
 
 # ----------------------------------------------------------------- portfolio
-def portfolio(trades, sims, sig, mode, first_i, equity0=100000.0):
+def portfolio(trades, sims, sig, mode, first_i, equity0=100000.0, skip=frozenset()):
     n = len(sig["idx"])
     by_day = {}
     for k, t in enumerate(trades):
@@ -252,7 +272,7 @@ def portfolio(trades, sims, sig, mode, first_i, equity0=100000.0):
             scale, max_r = 1.0, 10
         else:  # advice
             scale, max_r = (1.0, 10) if reg >= 7 else ((1.0, 6) if reg >= 4 else (0.5, 3))
-        cands = sorted(by_day.get(d, []), key=lambda k: -trades[k]["rs"])
+        cands = sorted((k for k in by_day.get(d, []) if k not in skip), key=lambda k: -trades[k]["rs"])
         for k in cands:
             if len(open_pos) * 1.0 >= max_r or sims[k] is None:
                 break
@@ -300,60 +320,93 @@ def stats(eq, trades, sims, taken, spy):
                 sharpe=round(sharpe, 2), final=round(float(e.iloc[-1]), 0), years=yrets)
 
 
+def fetch_earnings(tickers):
+    from concurrent.futures import ThreadPoolExecutor
+    cache = json.load(open(EARN_CACHE)) if os.path.exists(EARN_CACHE) else {}
+    todo = [t for t in tickers if t not in cache]
+    print(f"earnings dates: {len(todo)} to fetch ({len(cache)} cached)", flush=True)
+    def one(t):
+        for _ in range(3):
+            try:
+                time.sleep(0.4)
+                d = yf.Ticker(t).get_earnings_dates(limit=100)
+                if d is None or len(d) == 0:
+                    time.sleep(3)
+                    continue
+                return t, sorted({str(x.date()) for x in d.index})
+            except Exception:
+                time.sleep(3)
+        return t, None
+    with ThreadPoolExecutor(2) as ex:
+        for k, (t, r) in enumerate(ex.map(one, todo), 1):
+            if r is not None:
+                cache[t] = r
+            if k % 100 == 0:
+                print(f"  {k}/{len(todo)}", flush=True)
+                json.dump(cache, open(EARN_CACHE, "w"))
+    json.dump(cache, open(EARN_CACHE, "w"))
+    return cache
+
+
 def main():
     t0 = time.time()
     px = load_prices()
-    print(f"prices: {len(px)} series ({time.time()-t0:.0f}s)")
-    sig = build_signals(px)
-    first_i = int(np.argmax(sig["idx"] >= pd.Timestamp(f"{START_YEAR}-01-01")))
-    print(f"signals built ({time.time()-t0:.0f}s); events: {int(sig['ev'].to_numpy().sum())}")
-    trades = find_trades(sig, first_i)
-    print(f"trades: {len(trades)} ({time.time()-t0:.0f}s)")
-    res = {}
-    curves = {}
-    spy = sig["spy"]
-    spyc = spy[spy.index >= sig["idx"][first_i]]
-    for policy in ("mixed", "strength"):
-        sims = [simulate(t, sig, policy) for t in trades]
-        for mode in ("all", "notred", "green", "advice"):
-            eq, taken = portfolio(trades, sims, sig, mode, first_i)
-            key = f"{policy}/{mode}"
-            res[key] = stats(eq, trades, sims, taken, spyc)
-            curves[key] = [round(float(v), 0) for v in eq.iloc[first_i::5].fillna(100000).tolist()]
-            print(key, {k: v for k, v in res[key].items() if k != "years"})
-    # by-regime expectancy on unfiltered trades (mixed policy), independent of sizing
-    sims = [simulate(t, sig, "mixed") for t in trades]
-    reg = {}
-    for lbl, lo, hi in (("green (≥7)", 7, 99), ("yellow (4–6)", 4, 6.99), ("red (≤3)", -1, 3.99)):
-        R = [sims[k]["R"] for k, t in enumerate(trades) if lo <= t["regime"] <= hi]
-        if R:
-            R = np.array(R)
-            reg[lbl] = dict(n=len(R), win=round(float((R > 0).mean()) * 100, 1), exp=round(float(R.mean()), 2),
-                            avgwin=round(float(R[R > 0].mean()) if (R > 0).any() else 0, 2),
-                            avgloss=round(float(R[R <= 0].mean()) if (R <= 0).any() else 0, 2))
-    ty = {}
-    for k, t in enumerate(trades):
-        y = str(sig["idx"][t["i"]].year)
-        ty.setdefault(y, []).append(sims[k]["R"])
-    byyear = {y: dict(n=len(v), exp=round(float(np.mean(v)), 2), win=round(float((np.array(v) > 0).mean()) * 100, 1))
-              for y, v in sorted(ty.items())}
-    spy_c = round(float((spyc.iloc[-1] / spyc.iloc[0]) ** (365.25 / ((spyc.index[-1] - spyc.index[0]).days)) - 1) * 100, 1)
-    spy_dd = round(float((spyc / spyc.cummax() - 1).min()) * 100, 1)
-    spy_y = {}
-    ye = spyc.groupby(spyc.index.year).last(); prev = spyc.iloc[0]
-    for y, v in ye.items():
-        spy_y[int(y)] = round(float(v / prev - 1) * 100, 1); prev = v
-    dates = [str(d.date()) for d in sig["idx"][first_i::5]]
-    spy_curve = [round(float(v / spyc.iloc[0] * 100000), 0) for v in spyc.iloc[::5].tolist()]
-    out = dict(start=str(sig["idx"][first_i].date()), end=str(sig["idx"][-1].date()), n_universe=len(sig["tick"]),
-               results=res, regime_expectancy=reg, by_year=byyear, spy=dict(cagr=spy_c, maxdd=spy_dd, years=spy_y),
-               dates=dates, curves=curves, spy_curve=spy_curve,
-               trades_sample=[dict(ticker=t["ticker"], date=str(sig["idx"][t["i"]].date()), R=round(sims[k]["R"], 2),
-                                   regime=t["regime"], bases=t["bases"], risk=round(t["risk"] * 100, 1), rs=round(t["rs"]),
-                                   dec=t["dec"], vol_dry=t["vol_dry"], hd=t["hd"], pa=t["pa"], ext=round(t["ext"] * 100, 1),
-                                   vr=round(t["vr"], 2))
-                              for k, t in enumerate(trades)])
-    json.dump(out, open(os.path.join(OUT, "backtest.json" if ENTRY == "close" else f"backtest_{ENTRY}.json"), "w"), ensure_ascii=False)
+    print(f"prices: {len(px)} series ({time.time()-t0:.0f}s)", flush=True)
+    idx_tick = {u["ticker"] for u in universe.load() if u["market"] == "US"}
+    UNIS = {"index": ([t for t in px if t in idx_tick], 20, 15e6),
+            "expanded": ([t for t in px if t not in ("SPY", "QQQ", "IWM")], 10, 5e6)}
+    res, curves, regs, tr_out = {}, {}, {}, {}
+    spy_stat = None
+    for uname, (tick, mp, mdv) in UNIS.items():
+        sig = build_signals(px, tick, mp, mdv)
+        first_i = int(np.argmax(sig["idx"] >= pd.Timestamp(f"{START_YEAR}-01-01")))
+        trades = find_trades(sig, first_i)
+        print(f"[{uname}] events {int(sig['ev'].to_numpy().sum())} trades {len(trades)} ({time.time()-t0:.0f}s)", flush=True)
+        earn = fetch_earnings(sorted({t["ticker"] for t in trades}))
+        skip = set()
+        for k, t in enumerate(trades):
+            ds = earn.get(t["ticker"]) or []
+            d0 = t["date"].date()
+            for x in ds:
+                dd = (pd.Timestamp(x).date() - d0).days
+                if 0 <= dd <= 7:
+                    skip.add(k); break
+        print(f"[{uname}] earnings within 7d of entry: {len(skip)} of {len(trades)}", flush=True)
+        spyc = sig["spy"][sig["spy"].index >= sig["idx"][first_i]]
+        for policy in ("mixed", "strength"):
+            sims = [simulate(t, sig, policy) for t in trades]
+            for en, sk in (("noearn", frozenset(skip)), ("earn", frozenset())):
+                for mode in ("all", "notred", "green", "advice"):
+                    eq, taken = portfolio(trades, sims, sig, mode, first_i, skip=sk)
+                    key = f"{uname}/{en}/{policy}/{mode}"
+                    res[key] = stats(eq, trades, sims, taken, spyc)
+                    if policy == "mixed":
+                        curves[key] = [round(float(v), 0) for v in eq.iloc[first_i::5].fillna(100000).tolist()]
+                    print(key, {k: v for k, v in res[key].items() if k != "years"}, flush=True)
+        # per-trade expectancy (mixed), by regime and earnings flag
+        sims = [simulate(t, sig, "mixed") for t in trades]
+        reg = {}
+        for lbl, lo, hi in (("green", 7, 99), ("yellow", 4, 6.99), ("red", -1, 3.99)):
+            R = np.array([sims[k]["R"] for k, t in enumerate(trades) if lo <= t["regime"] <= hi])
+            if len(R):
+                reg[lbl] = dict(n=len(R), win=round(float((R > 0).mean()) * 100, 1), exp=round(float(R.mean()), 2))
+        Re = np.array([sims[k]["R"] for k in range(len(trades)) if k in skip]); Rn = np.array([sims[k]["R"] for k in range(len(trades)) if k not in skip])
+        reg["earnings_near"] = dict(n=int(len(Re)), win=round(float((Re > 0).mean()) * 100, 1) if len(Re) else 0, exp=round(float(Re.mean()), 2) if len(Re) else 0)
+        reg["earnings_far"] = dict(n=int(len(Rn)), win=round(float((Rn > 0).mean()) * 100, 1), exp=round(float(Rn.mean()), 2))
+        regs[uname] = reg
+        tr_out[uname] = dict(n=len(trades), n_universe=len(tick))
+        if spy_stat is None:
+            ye = spyc.groupby(spyc.index.year).last(); prev = spyc.iloc[0]; yy = {}
+            for y, v in ye.items():
+                yy[int(y)] = round(float(v / prev - 1) * 100, 1); prev = v
+            spy_stat = dict(cagr=round(float((spyc.iloc[-1] / spyc.iloc[0]) ** (365.25 / ((spyc.index[-1] - spyc.index[0]).days)) - 1) * 100, 1),
+                            maxdd=round(float((spyc / spyc.cummax() - 1).min()) * 100, 1), years=yy)
+            dates = [str(d.date()) for d in sig["idx"][first_i::5]]
+            spy_curve = [round(float(v / spyc.iloc[0] * 100000), 0) for v in spyc.iloc[::5].tolist()]
+        del sig
+    out = dict(start=dates[0], end=dates[-1], entry=ENTRY, results=res, curves=curves, regime=regs, unis=tr_out,
+               spy=spy_stat, dates=dates, spy_curve=spy_curve)
+    json.dump(out, open(os.path.join(OUT, f"backtest2_{ENTRY}.json"), "w"), ensure_ascii=False)
     print(f"done in {time.time()-t0:.0f}s")
 
 
