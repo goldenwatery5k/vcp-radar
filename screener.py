@@ -582,7 +582,12 @@ def main():
     order = {"BO0": 0, "NEAR": 1, "BOK": 2, "BOW": 3, "FORM": 4, "EXT": 5, "S2": 6}
     cands.sort(key=lambda c: (order.get(c["code"], 9), -c["score"]))
     asof = max(x["dates"][-1] for x in xs.values())
-    data = dict(generated=dt.datetime.now().strftime("%Y-%m-%d %H:%M"), asof=str(asof.date()),
+    from zoneinfo import ZoneInfo
+    _now = dt.datetime.now(dt.timezone.utc)
+    _et = _now.astimezone(ZoneInfo("America/New_York"))
+    _intraday = _et.weekday() < 5 and (9, 30) <= (_et.hour, _et.minute) < (16, 0)
+    data = dict(generated=_now.astimezone(ZoneInfo("Asia/Hong_Kong")).strftime("%Y-%m-%d %H:%M") + " HKT",
+                intraday=_intraday, asof=str(asof.date()),
                 config=dict(markets=markets, risk=R, entry=E, liquidity=CFG["liquidity"], trend=T),
                 regime=regime, macro=macro, sector_perf=sector_perf, groups=groups[:40], sectors=sectors,
                 note_pairs=MM.get("note_pairs", []), stocks=cands)

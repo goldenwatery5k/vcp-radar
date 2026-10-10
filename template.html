@@ -200,6 +200,7 @@ const CODE_ORDER = {BO0:0, NEAR:1, BOK:2, BOW:3, FORM:4, EXT:5, S2:6};
 
 // ---------------------------------------------------------------- header + regime
 $('#asof').textContent = `資料日期 ${D.asof} · 生成 ${D.generated}`;
+if (D.intraday) $('#asof').textContent += ' · ⚠ 盤中未收市數據(今日K線未完成,突破量比偏低,收市後再確認)';
 (function regime(){
   const r = D.regime, b = r.breadth;
   const names = {green:'進取', yellow:'中性', red:'防守'};

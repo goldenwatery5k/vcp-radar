@@ -2,7 +2,8 @@ name: daily-vcp-radar
 
 on:
   schedule:
-    - cron: "30 22 * * 1-5"   # 美股收市後(UTC 22:30,香港約翌日 06:30),星期一至五
+    - cron: "5 13-21 * * 1-5"   # 美股盤中每小時(UTC 13:05–21:05,夏/冬令都覆蓋),星期一至五
+    - cron: "30 22 * * 1-5"     # 收市後最終版(UTC 22:30,香港約翌日 06:30)
   workflow_dispatch: {}        # 可以喺 Actions 頁手動撳 Run workflow
 
 permissions:
