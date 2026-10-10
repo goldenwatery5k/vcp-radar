@@ -622,6 +622,12 @@ def main():
                 note_pairs=MM.get("note_pairs", []), stocks=cands)
     mp = os.path.join(HERE, "data", "momentum.json")
     data["momentum"] = json.load(open(mp)) if os.path.exists(mp) else None
+    if data["momentum"]:
+        try:
+            import momentum as _mom
+            data["momentum"] = _mom.refresh_prices(data["momentum"])
+        except Exception as e:
+            print("momentum refresh skipped:", e)
     json.dump(data, open(os.path.join(OUT, "data.json"), "w"), ensure_ascii=False, separators=(",", ":"))
     build_html(data)
     print(f"done in {time.time()-t0:.0f}s  -> out/index.html")

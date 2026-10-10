@@ -773,25 +773,51 @@ function momentumView() {
   const M = D.momentum;
   if (!M) return '<p class="note">動量排行榜尚未生成。每月月初由自動任務更新。</p>';
   const yh = t => `https://finance.yahoo.com/quote/${t}`;
-  const rows = M.rows.map(r => `<tr class="${r.rank<=M.top_n?'':'dim'}">
-    <td class="n">#${r.rank}</td>
-    <td><b><a href="${yh(r.ticker)}" target="_blank" rel="noopener">${r.ticker}</a></b>${r.rank<=M.top_n?' <span class="tag good">模型組合</span>':''}${r.new?' <span class="tag warn">新進</span>':''}
-      <div class="note">${r.name||''}</div></td>
-    <td class="r n">${r.score.toFixed(1)}</td><td class="r n">${pct(r.mom,0)}</td><td class="r n">${r.vol.toFixed(0)}%</td>
-    <td class="r n">${pct(r.r3m,0)}</td><td class="r n">${pct(r.from_hi,0)}</td>
-    <td class="r n">${fmt(r.price)}</td><td class="r n">${pct(r.since,1)}</td><td class="r n">${r.dollar_vol>=1000?(r.dollar_vol/1000).toFixed(1)+'B':r.dollar_vol.toFixed(0)+'M'}</td></tr>`).join('');
-  const drop = M.dropped.length ? `<p class="note">本月跌出模型組合:${M.dropped.map(d=>d.ticker).join('、')}。</p>` : '';
-  return `<div class="sec"><h4>動量排行榜(每月更新)</h4>
-  <p class="note">訊號日 <b>${M.signal_date}</b> 收市,模型組合於 <b>${M.rebalance_date}</b> 調倉;最新股價 ${M.price_date}。成交額最高 1,000 隻美股中,股價在 200 日線上、近 60 日年化波幅 ≥12% 嘅 ${M.universe} 隻入面排名。
-  分數 = 12-1 個月回報 ÷ 近 60 日年化波幅(跳過最近 1 個月)。模型 = 買排名最前 ${M.top_n} 隻,等權,每月調倉。</p>
-  <div class="tbl-wrap"><table style="min-width:760px"><thead><tr><th>排名</th><th>股票</th><th class="r">分數</th><th class="r">12-1 回報</th><th class="r">波幅</th><th class="r">近 3 個月</th><th class="r">距 52 週高</th><th class="r">訊號日價</th><th class="r">調倉後</th><th class="r">日均成交</th></tr></thead><tbody>${rows}</tbody></table></div>
-  ${drop}
-  <div class="sec"><h4>回測參考(2018 至今,美股,扣每邊 0.1% 成本)</h4>
+  const top = M.rows.filter(r => r.rank <= M.top_n);
+  const nStop = top.filter(r => r.stopped).length;
+  const row = r => {
+    const inModel = r.rank <= M.top_n;
+    const dist = r.stop!=null && r.now ? (r.now / r.stop - 1) * 100 : null;
+    const st = r.stopped ? `<span class="tag bad" title="收市價曾跌穿最高收市價 −20%${r.stop_date?'('+r.stop_date+')':''}">已止蝕 ${r.stop_date||''}</span>`
+             : (inModel ? '<span class="tag good">持有</span>' : '');
+    return `<tr class="${inModel?'':'dim'}">
+      <td class="n">#${r.rank}</td>
+      <td><b><a href="${yh(r.ticker)}" target="_blank" rel="noopener">${r.ticker}</a></b>${r.new?' <span class="tag warn">新進</span>':''}
+        <div class="note">${r.name||''}</div></td>
+      <td class="r n">${r.score.toFixed(1)}</td><td class="r n">${pct(r.mom,0)}</td><td class="r n">${r.vol.toFixed(0)}%</td>
+      <td class="r n">${fmt(r.price)}</td><td class="r n">${fmt(r.now)}</td><td class="r n">${pct(r.since,1)}</td>
+      <td class="r n">${fmt(r.hi_close)}</td><td class="r n"><b>${fmt(r.stop)}</b></td>
+      <td class="r n">${dist==null?'—':pct(dist,1)}</td><td>${st}</td></tr>`;
+  };
+  const drop = M.dropped.length ? `<p class="note">本月跌出前 ${M.top_n} 名:${M.dropped.map(d=>d.ticker).join('、')}(已喺月初調倉時賣出)。</p>` : '';
+  return `<div class="sec"><h4>動量排行榜(每月調倉,止蝕每日更新)</h4>
+  <p class="note">訊號日 <b>${M.signal_date}</b> 收市,調倉日 <b>${M.rebalance_date}</b>,最新收市價 ${M.price_date}。
+  股票池:成交額最高 1,000 隻美股中,收市在 200 日線上、近 60 日年化波幅 ≥12% 嘅 ${M.universe} 隻。
+  分數 = 12-1 個月回報 ÷ 近 60 日年化波幅(跳過最近 1 個月)。現時前 ${M.top_n} 名之中 <b>${nStop}</b> 隻已觸發止蝕。</p>
+  <div class="sec"><h4>建議用法(回測最合理嘅一套)</h4>
   <ul>
-    <li>同一規則(買最前 20 隻、每月輪換):年化約 <b>25%</b>,SPY 約 14.7%;最大回撤約 −39%(SPY −34%);夏普約 0.81(SPY 0.82)。2018–2022 年化 19%,2023 至今 34%。</li>
-    <li>主要係較高 beta(對 SPY 約 1.2)加上成長股行情。扣除市場後嘅超額回報 t 值約 1,統計上未能證明有 alpha。2018、2021、2023 年跑輸 SPY。</li>
-    <li>價格數據只含今日仍然上市嘅公司(倖存者偏差,回測偏樂觀);中小型股實際成本可能更高(每邊 0.3% 時年化約 22%)。</li>
-    <li>排名偏重暴升股,波動大。呢頁係參考工具,唔係買賣建議;冇止蝕,實際落注請自行控制倉位大小。</li>
+    <li><b>核心 + 衛星</b>:50% 放 SPY 作核心;另外 50% 放呢個排行榜前 ${M.top_n} 隻,等權,即係每隻佔總資金 2.5%。</li>
+    <li><b>每隻有止蝕</b>:由調倉日起計,收市價由最高收市價回落 20% 就賣出,轉做現金,等下個月調倉先再入。每隻最大虧損約為總資金 0.5%(2.5% × 20%)。</li>
+    <li><b>每月調倉一次</b>:月初用新排名換走跌出前 ${M.top_n} 名嘅股票;已止蝕嗰啲位置亦喺呢個時候重新揀。</li>
+  </ul></div>
+  <div class="tbl-wrap"><table style="min-width:900px"><thead><tr><th>排名</th><th>股票</th><th class="r">分數</th><th class="r">12-1 回報</th><th class="r">波幅</th>
+    <th class="r">訊號日價</th><th class="r">最新價</th><th class="r">調倉後</th><th class="r">最高收市</th><th class="r">止蝕價</th><th class="r">距止蝕</th><th>狀態</th></tr></thead>
+    <tbody>${M.rows.map(row).join('')}</tbody></table></div>
+  ${drop}
+  <div class="sec"><h4>回測參考(2018 至今,美股,每邊成本 0.1%)</h4>
+  <div class="tbl-wrap"><table style="min-width:560px"><thead><tr><th>組合</th><th class="r">年化</th><th class="r">最大回撤</th><th class="r">夏普</th><th class="r">2018–22</th><th class="r">2023 至今</th></tr></thead><tbody>
+    <tr><td>SPY 買入持有</td><td class="r n">14.7%</td><td class="r n">−33.7%</td><td class="r n">0.82</td><td class="r n">9.3%</td><td class="r n">22.4%</td></tr>
+    <tr><td><b>50% SPY + 50% 動量(20% 追蹤止蝕)</b></td><td class="r n"><b>19.0%</b></td><td class="r n"><b>−30.8%</b></td><td class="r n"><b>0.90</b></td><td class="r n">14.4%</td><td class="r n">25.4%</td></tr>
+    <tr><td>100% 動量(20% 追蹤止蝕)</td><td class="r n">21.6%</td><td class="r n">−32.1%</td><td class="r n">0.80</td><td class="r n">18.0%</td><td class="r n">26.6%</td></tr>
+    <tr><td>100% 動量(冇止蝕)</td><td class="r n">25.4%</td><td class="r n">−37.5%</td><td class="r n">0.83</td><td class="r n">18.7%</td><td class="r n">35.0%</td></tr>
+  </tbody></table></div>
+  <ul>
+    <li>核心衛星版本:三段時期(全期、2018–22、2023 至今)年化全部高過 SPY,最大回撤同夏普亦較好。2018 年 −13%(SPY −4.6%)、2020 年 +45%(SPY +18%)、2022 年 −5%(SPY −18%)。</li>
+    <li>每邊成本升至 0.3% 時,年化約 17.4%,回撤 −30.9%,夏普 0.84。</li>
+    <li><b>統計上未能肯定</b>:每年超額約 4.3%,t 值約 1.0(bootstrap 有約 11% 機會超額 ≤0);樣本只有約 8.8 年,主要受 2020、2024 年成長股行情帶動。</li>
+    <li>價格數據只含今日仍然上市嘅公司(倖存者偏差,回測偏樂觀)。止蝕以收市價計,實際可能因跳空而成交差過止蝕價。</li>
+    <li>試過但冇幫助:大市跌穿 200 日線就清倉(年化減少約 7 個百分點)、50 日線離場(夏普下跌)、按波幅加權(冇明顯改善)。</li>
+    <li>呢頁係參考工具,唔係買賣建議。</li>
   </ul></div></div>`;
 }
 function rulesView() {

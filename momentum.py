@@ -7,6 +7,10 @@ Rule (same as backtest research_c.py "risk-adj mom (12-1/vol)", N=20):
 Run:  python momentum.py            (downloads ~5,000 tickers, a few minutes)
       python momentum.py --cache    (reuse data/bt_prices_all.pkl, for local tests)
 Out:  data/momentum.json
+
+Suggested use (backtested as "core-satellite"): 50% SPY + 50% this basket, 20 names equal weight (2.5% of the
+whole portfolio each), 20% trailing stop on each name from its highest close; stopped names stay in cash until
+the next monthly rebalance. refresh_prices() updates the stop status daily from fresh closes.
 """
 import io
 import json
@@ -24,6 +28,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "data", "momentum.json")
 H = {"User-Agent": "Mozilla/5.0"}
 TOP_N, SHOW = 20, 60
+STOP_PCT = 20          # trailing stop from highest close since the signal day (close basis)
 
 
 def listed_us():
@@ -76,6 +81,33 @@ def score_at(C, V, i):
     return sc, mom, vol, dv, s200
 
 
+def refresh_prices(m):
+    """Update now / since / trailing-stop fields of a momentum.json dict from recent closes (called by the daily site build)."""
+    tick = [r["ticker"] for r in m["rows"]] + [d["ticker"] for d in m.get("dropped", [])]
+    df = yf.download(tick, period="6mo", interval="1d", auto_adjust=True, progress=False, group_by="ticker", threads=True)
+    sig = pd.Timestamp(m["signal_date"])
+    for r in m["rows"]:
+        try:
+            c = df[r["ticker"]]["Close"].dropna() if len(tick) > 1 else df["Close"].dropna()
+            c = c[c.index >= sig]
+            if len(c) < 1:
+                continue
+            run_hi = c.cummax()
+            hit = c < run_hi * (1 - STOP_PCT / 100)
+            hi = float(run_hi.iloc[-1])
+            r["now"] = round(float(c.iloc[-1]), 2)
+            r["hi_close"] = round(hi, 2)
+            r["stop"] = round(hi * (1 - STOP_PCT / 100), 2)
+            r["stopped"] = bool(hit.any())
+            r["stop_date"] = str(hit[hit].index[0].date()) if hit.any() else None
+            reb = c.iloc[1] if len(c) > 1 else c.iloc[0]   # first close after the signal day = rebalance-day close
+            r["since"] = round(float(c.iloc[-1] / reb - 1) * 100, 1)
+            m["price_date"] = str(c.index[-1].date())
+        except Exception:
+            pass
+    return m
+
+
 def main():
     t0 = time.time()
     names = listed_us()
@@ -122,6 +154,10 @@ def main():
         dropped=[dict(ticker=t, name=names.get(t, ""), rank=int(list(ranked.index).index(t) + 1) if t in ranked.index else None) for t in dropped],
         rows=rows,
         generated=pd.Timestamp.now(tz="Asia/Hong_Kong").strftime("%Y-%m-%d %H:%M") + " HKT")
+    try:
+        out = refresh_prices(out)
+    except Exception as e:
+        print("refresh failed", e)
     json.dump(out, open(OUT, "w"), ensure_ascii=False)
     print(f"signal {out['signal_date']}  rebalance {out['rebalance_date']}  universe {out['universe']}  "
           f"top: {[r['ticker'] for r in rows[:10]]}  ({time.time()-t0:.0f}s)")
