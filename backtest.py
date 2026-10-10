@@ -126,7 +126,7 @@ def build_signals(px, tick, min_price, min_dv):
             pts += (c > c.rolling(200).mean()).astype(float)
     pts += np.where(b50 >= 0.5, 2, np.where(b50 >= 0.35, 1, 0))
     pts += (s2p >= 0.15).astype(float) + (nh > nl).astype(float)
-    return dict(idx=idx, tick=tick, C=C, H=H, L=L, O=O, V=V, s10=s10, s20=s20, ev=ev, rs=rs, regime=pts,
+    return dict(idx=idx, tick=tick, C=C, H=H, L=L, O=O, V=V, s10=s10, s20=s20, ev=ev, rs=rs, regime=pts, raw=raw, liquid=liquid,
                 spy=px["SPY"]["Close"].reindex(idx).ffill())
 
 
