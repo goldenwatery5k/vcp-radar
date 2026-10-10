@@ -620,6 +620,8 @@ def main():
                 config=dict(markets=markets, risk=R, entry=E, liquidity=CFG["liquidity"], trend=T),
                 regime=regime, macro=macro, sector_perf=sector_perf, groups=groups[:40], sectors=sectors,
                 note_pairs=MM.get("note_pairs", []), stocks=cands)
+    mp = os.path.join(HERE, "data", "momentum.json")
+    data["momentum"] = json.load(open(mp)) if os.path.exists(mp) else None
     json.dump(data, open(os.path.join(OUT, "data.json"), "w"), ensure_ascii=False, separators=(",", ":"))
     build_html(data)
     print(f"done in {time.time()-t0:.0f}s  -> out/index.html")

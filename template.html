@@ -77,6 +77,7 @@ td.tk small{display:block;font-weight:400;color:var(--muted);max-width:210px;ove
 .b-FORM{background:var(--panel2);color:var(--muted);border-color:var(--line)}
 .b-EXT{background:var(--bad-bg);color:var(--bad);border-color:var(--bad)}
 .b-S2{background:var(--panel2);color:var(--ink);border-color:var(--line)}
+tr.dim td{opacity:.78}
 .tag{display:inline-block;font-size:11px;padding:0 6px;border-radius:4px;margin-right:4px;border:1px solid var(--line);color:var(--muted)}
 .tag.good{color:var(--good);border-color:var(--good);background:var(--good-bg)}
 .tag.bad{color:var(--bad);border-color:var(--bad);background:var(--bad-bg)}
@@ -261,7 +262,7 @@ function sorted(rows) {
 // ---------------------------------------------------------------- tabs
 const TABS = [
   ['entry','今日入場名單'], ['form','成形中 / 已離買點'], ['s2','Stage 2 領導股 watchlist'],
-  ['topdown','Top-down 宏觀 mind map'], ['groups','板塊強度'], ['rules','規則速查']
+  ['topdown','Top-down 宏觀 mind map'], ['groups','板塊強度'], ['momentum','動量排行榜'], ['rules','規則速查']
 ];
 function renderTabs() {
   $('#tabs').innerHTML = TABS.map(([k,l]) => {
@@ -768,6 +769,31 @@ function groupsView() {
   <h4 class="sec">GICS 板塊(11 個)</h4>
   <div class="tbl-wrap"><table style="min-width:520px"><thead><tr><th>排名</th><th>板塊</th><th class="r">RS 中位數</th><th class="r">Stage 2 比例</th><th class="r">股數</th></tr></thead><tbody>${sec}</tbody></table></div>`;
 }
+function momentumView() {
+  const M = D.momentum;
+  if (!M) return '<p class="note">動量排行榜尚未生成。每月月初由自動任務更新。</p>';
+  const yh = t => `https://finance.yahoo.com/quote/${t}`;
+  const rows = M.rows.map(r => `<tr class="${r.rank<=M.top_n?'':'dim'}">
+    <td class="n">#${r.rank}</td>
+    <td><b><a href="${yh(r.ticker)}" target="_blank" rel="noopener">${r.ticker}</a></b>${r.rank<=M.top_n?' <span class="tag good">模型組合</span>':''}${r.new?' <span class="tag warn">新進</span>':''}
+      <div class="note">${r.name||''}</div></td>
+    <td class="r n">${r.score.toFixed(1)}</td><td class="r n">${pct(r.mom,0)}</td><td class="r n">${r.vol.toFixed(0)}%</td>
+    <td class="r n">${pct(r.r3m,0)}</td><td class="r n">${pct(r.from_hi,0)}</td>
+    <td class="r n">${fmt(r.price)}</td><td class="r n">${pct(r.since,1)}</td><td class="r n">${r.dollar_vol>=1000?(r.dollar_vol/1000).toFixed(1)+'B':r.dollar_vol.toFixed(0)+'M'}</td></tr>`).join('');
+  const drop = M.dropped.length ? `<p class="note">本月跌出模型組合:${M.dropped.map(d=>d.ticker).join('、')}。</p>` : '';
+  return `<div class="sec"><h4>動量排行榜(每月更新)</h4>
+  <p class="note">訊號日 <b>${M.signal_date}</b> 收市,模型組合於 <b>${M.rebalance_date}</b> 調倉;最新股價 ${M.price_date}。成交額最高 1,000 隻美股中,股價在 200 日線上、近 60 日年化波幅 ≥12% 嘅 ${M.universe} 隻入面排名。
+  分數 = 12-1 個月回報 ÷ 近 60 日年化波幅(跳過最近 1 個月)。模型 = 買排名最前 ${M.top_n} 隻,等權,每月調倉。</p>
+  <div class="tbl-wrap"><table style="min-width:760px"><thead><tr><th>排名</th><th>股票</th><th class="r">分數</th><th class="r">12-1 回報</th><th class="r">波幅</th><th class="r">近 3 個月</th><th class="r">距 52 週高</th><th class="r">訊號日價</th><th class="r">調倉後</th><th class="r">日均成交</th></tr></thead><tbody>${rows}</tbody></table></div>
+  ${drop}
+  <div class="sec"><h4>回測參考(2018 至今,美股,扣每邊 0.1% 成本)</h4>
+  <ul>
+    <li>同一規則(買最前 20 隻、每月輪換):年化約 <b>25%</b>,SPY 約 14.7%;最大回撤約 −39%(SPY −34%);夏普約 0.81(SPY 0.82)。2018–2022 年化 19%,2023 至今 34%。</li>
+    <li>主要係較高 beta(對 SPY 約 1.2)加上成長股行情。扣除市場後嘅超額回報 t 值約 1,統計上未能證明有 alpha。2018、2021、2023 年跑輸 SPY。</li>
+    <li>價格數據只含今日仍然上市嘅公司(倖存者偏差,回測偏樂觀);中小型股實際成本可能更高(每邊 0.3% 時年化約 22%)。</li>
+    <li>排名偏重暴升股,波動大。呢頁係參考工具,唔係買賣建議;冇止蝕,實際落注請自行控制倉位大小。</li>
+  </ul></div></div>`;
+}
 function rulesView() {
   const c = D.config;
   return `<div class="rules">
@@ -826,6 +852,7 @@ function render(keepScroll) {
   else if (S.tab==='s2') v.innerHTML = listView(CODES.s2, '冇符合嘅 Stage 2 領導股。');
   else if (S.tab==='topdown') v.innerHTML = topdownView();
   else if (S.tab==='groups') v.innerHTML = groupsView();
+  else if (S.tab==='momentum') v.innerHTML = momentumView();
   else v.innerHTML = rulesView();
   if (CODES[S.tab]) bindList();
   document.querySelectorAll('[data-go]').forEach(n => n.onclick = () => {
