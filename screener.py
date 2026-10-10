@@ -170,8 +170,12 @@ def analyze(t, d, rs_raw_all, meta, mkt):
         "c7": None,  # RS filled later
         "c8": bool(last > s50[-1]),
     }
+    # Stage 3 (見頂):已經大升過 + 150 日線走平(升幅 < flat_150_pct / 21 日)
+    flat150 = bool(s150[-1] / s150[-22] - 1 < T.get("stage3_flat_150_pct", 0.01))
+    ran = bool(hi52 / lo52 - 1 >= T.get("stage3_min_run", 0.30))
+    stage3 = bool(T.get("exclude_stage3", True) and flat150 and ran)
     return dict(ticker=t, o=o, h=h, l=l, c=c, v=v, s20=s20, s50=s50, s150=s150, s200=s200,
-               hi52=hi52, lo52=lo52, last=last, avg_dv=avg_dv, tt=tt, n=n, meta=meta, mkt=mkt)
+               hi52=hi52, lo52=lo52, last=last, avg_dv=avg_dv, tt=tt, n=n, meta=meta, mkt=mkt, stage3=stage3)
 
 
 def event_scan(x):
@@ -482,9 +486,13 @@ def main():
     # ---- candidates
     cands = []
     s2_only = []
+    n_stage3 = 0
     for t, x in xs.items():
         tt_n = sum(1 for vv in x["tt"].values() if vv)
         if tt_n < CFG["output"]["min_tt_n"]:
+            continue
+        if x["stage3"]:
+            n_stage3 += 1
             continue
         rs = int(rs_pct[t])
         ev = event_scan(x)
@@ -496,7 +504,7 @@ def main():
     s2_only.sort(key=lambda a: -a[0])
     for rs, x in s2_only[:CFG["output"]["max_s2_only"]]:
         cands.append(build_s2_only(x, rs))
-    print(f"  candidates: {len(cands)}  (breakout/near/forming: {sum(1 for c in cands if c['code']!='S2')})")
+    print(f"  candidates: {len(cands)}  (breakout/near/forming: {sum(1 for c in cands if c['code']!='S2')})  · Stage 3 已剔走: {n_stage3}")
 
     # ---- fundamentals for finalists
     fin = [c["ticker"] for c in cands]

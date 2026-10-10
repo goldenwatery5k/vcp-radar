@@ -1,30 +1,43 @@
 {
   "_說明": "所有門檻都係常見嘅 Stage 2 + VCP 趨勢突破慣例,可以自己改。改完再行 ./run.sh 就生效。",
-  "markets": ["US"],
+  "markets": [
+    "US"
+  ],
   "history_period": "2y",
   "chunk": 80,
   "liquidity": {
-    "US": {"min_price": 20, "min_avg_dollar_vol": 15000000, "min_mcap": 3000000000},
-    "HK": {"min_price": 3,  "min_avg_dollar_vol": 40000000, "min_mcap": 5000000000}
+    "US": {
+      "min_price": 20,
+      "min_avg_dollar_vol": 15000000,
+      "min_mcap": 3000000000
+    },
+    "HK": {
+      "min_price": 3,
+      "min_avg_dollar_vol": 40000000,
+      "min_mcap": 5000000000
+    }
   },
   "trend_template": {
     "min_rs": 70,
     "within_52w_high": 0.25,
     "above_52w_low": 0.25,
-    "ma200_up_days": 21
+    "ma200_up_days": 21,
+    "exclude_stage3": true,
+    "stage3_flat_150_pct": 0.01,
+    "stage3_min_run": 0.3
   },
   "base": {
     "lookback": 150,
     "min_len": 20,
     "max_len": 190,
     "depth_min": 0.06,
-    "depth_max": 0.40,
+    "depth_max": 0.4,
     "rim_gap_max": 0.12,
     "handle_depth_max": 0.12,
     "handle_pos_min": 0.25,
-    "prior_adv_min": 0.30,
+    "prior_adv_min": 0.3,
     "zigzag_pct": 0.04,
-    "vol_dry_max": 0.90
+    "vol_dry_max": 0.9
   },
   "entry": {
     "near_pivot_pct": 0.03,
@@ -32,7 +45,7 @@
     "breakout_vol_ratio": 1.5,
     "chase_limit_pct": 0.05,
     "stop_below_handle_low": 0.01,
-    "max_stop_pct": 0.10,
+    "max_stop_pct": 0.1,
     "min_stop_pct": 0.05,
     "scan_days_back": 8
   },
