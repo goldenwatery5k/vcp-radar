@@ -103,12 +103,14 @@ def base_at(h, l, c, v, e):
     irh = it + int(np.argmax(h[it:e + 1]))
     rh = h[irh]
     rim_gap = (peak - rh) / peak
-    if rim_gap > B["rim_gap_max"]:
-        return None
     hl = float(l[irh:e + 1].min())
     handle_len = e - irh
     handle_depth = (rh - hl) / rh
     pos = (hl - low) / (peak - low) if peak > low else 1.0
+    # 杯柄(handle 喺杯上三分一)要求反彈到近左頂;cheat 容許較闊
+    gap_max = B.get("rim_gap_cup_max", B["rim_gap_max"]) if pos >= 0.667 else B["rim_gap_max"]
+    if rim_gap > gap_max:
+        return None
     if pos < B["handle_pos_min"] or handle_depth > B["handle_depth_max"]:
         return None
     # contractions (down-legs after the left peak)

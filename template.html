@@ -306,7 +306,8 @@ function tags(s) {
   if (s.sales_ok===false) t.push(`<span class="tag warn" title="最新季銷售增長 ${(s.sales_growth*100).toFixed(0)}%">銷售弱</span>`);
   if (s.mcap_ok===false) t.push(`<span class="tag warn">市值偏細</span>`);
   if (s.stop_adj) t.push(`<span class="tag" title="技術止蝕太近,已改用最少 5% 止蝕">止蝕已放寬</span>`);
-  if (s.no_entry) t.push(`<span class="tag bad" title="handle 低位止蝕超過 10%,10/20 日線亦搵唔到 5–10% 內嘅支持位">不建議入場</span>`);
+    if (s.base && s.base.rim_gap>=3) t.push(`<span class="tag warn" title="買點(handle 高位)比杯嘅左頂低 ${s.base.rim_gap}%,突破後上方仲有左邊阻力">左頂仲高 ${s.base.rim_gap}%</span>`);
+if (s.no_entry) t.push(`<span class="tag bad" title="handle 低位止蝕超過 10%,10/20 日線亦搵唔到 5–10% 內嘅支持位">不建議入場</span>`);
   else if (s.stop_src && s.stop_src!=='handle 低位') t.push(`<span class="tag warn" title="handle 低位止蝕超過 10%,改用${s.stop_src}做止蝕">止蝕改用${s.stop_src}</span>`);
   return t.join('');
 }
@@ -620,6 +621,7 @@ function tvChart(host, s) {
     L(s.t2, C.good, `TP1 2R +${up(s.t2)}% 沽一半`, LW.LineStyle.Solid, 2);
     L(s.t3, C.good, 'TP2 3R 沽餘下', LW.LineStyle.Dashed);
     if (s.resist) L(s.resist, C.warn, '左邊阻力', LW.LineStyle.LargeDashed);
+    if (s.geo && s.geo.peak && s.geo.peak[1] > s.pivot*1.005) L(s.geo.peak[1], C.muted, `左頂 +${((s.geo.peak[1]/s.pivot-1)*100).toFixed(1)}%`, LW.LineStyle.Dotted);
   }
   // overlay (risk/reward boxes, base box, buy zone)
   const ov = document.createElement('canvas');

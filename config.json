@@ -37,7 +37,8 @@
     "handle_pos_min": 0.25,
     "prior_adv_min": 0.3,
     "zigzag_pct": 0.04,
-    "vol_dry_max": 0.9
+    "vol_dry_max": 0.9,
+    "rim_gap_cup_max": 0.05
   },
   "entry": {
     "near_pivot_pct": 0.03,
